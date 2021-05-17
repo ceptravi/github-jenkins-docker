@@ -1,22 +1,43 @@
 pipeline {
-   agent any
 
-   stages {
-      stage('Build') {
-        steps {
-          echo 'Building...'
-          echo "Running ${env.BUILD_ID} ${env.BUILD_DISPLAY_NAME} on ${env.NODE_NAME} and JOB ${env.JOB_NAME}"
+  agent any
+
+  stages {
+
+    stage('Checkout Source') {
+      steps {
+        git url:'https://github.com/ceptravi/github-jenkins-docker.git', branch:'main'
+      }
+    }
+    
+      stage("Build image") {
+            steps {
+                script {
+                    myapp = docker.build("ceptravi/github-jenkins-docker:${env.BUILD_ID}")
+                }
+            }
         }
-   }
-   stage('Test') {
-     steps {
-        echo 'Testing...'
-     }
-   }
-   stage('Deploy') {
-     steps {
-       echo 'Deploying...'
-     }
-   }
+    
+      stage("Push image") {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub') {
+                            myapp.push("latest")
+                            myapp.push("${env.BUILD_ID}")
+                    }
+                }
+            }
+        }
+
+    
+    stage('Deploy App') {
+      steps {
+        script {
+          kubernetesDeploy(configs: "hellowhale.yml", kubeconfigId: "mykubeconfig")
+        }
+      }
+    }
+
   }
+
 }
